@@ -109,9 +109,10 @@
 
 ```
 aircraft_battle/
+├── bgm/                # 背景音乐文件夹
+├── picture/            # 图片资源文件夹
 ├── index.html          # 游戏主页面
 ├── game.js            # 游戏逻辑代码
-├── KOTOKO - jihad.mp3 # 背景音乐文件
 └── README.md          # 项目说明文档
 ```
 
