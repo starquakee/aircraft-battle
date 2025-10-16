@@ -116,6 +116,10 @@ aircraft_battle/
 └── README.md          # 项目说明文档
 ```
 
+## 📸 示例截图
+
+![示例：游戏界面](picture/demo.png)
+
 ## 🎯 游戏技巧
 
 1. **合理移动**：利用WASD键灵活躲避敌机和子弹
