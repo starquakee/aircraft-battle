@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞机大战</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #001122, #003366);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            position: relative;
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px #00ffff;
+        }
+        
+        canvas {
+            display: block;
+            background: linear-gradient(to bottom, #000033, #000066);
+        }
+        
+        .game-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ffff;
+            font-size: 18px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00ffff;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .restart-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            text-align: center;
+        }
+        
+        .restart-button button {
+            background: linear-gradient(45deg, #00ffff, #0066ff);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .restart-button button:hover {
+            background: linear-gradient(45deg, #00cccc, #0055cc);
+            box-shadow: 0 6px 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="1000" height="750"></canvas>
+        <div class="game-info">
+            <div>血量: <span id="health">100</span></div>
+            <div>得分: <span id="score">0</span></div>
+            <div>武器等级: <span id="weaponLevel">1</span></div>
+            <div>游戏时长: <span id="gameTime">00:00</span></div>
+        </div>
+        <div class="controls">
+            使用 WASD 键控制飞机移动 | 点击屏幕开始游戏
+        </div>
+        <div class="restart-button" id="restartButton">
+            <button onclick="restartGame()">重新开始</button>
+        </div>
+    </div>
+    
+    <!-- 背景音乐和音效 -->
+    <audio id="bgMusic" loop>
+        <source src="KOTOKO - jihad.mp3" type="audio/mpeg">
+    </audio>
+    
+    <script src="game.js"></script>
+</body>
+</html>
