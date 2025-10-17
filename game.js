@@ -11,6 +11,7 @@ class Game {
         this.gameStarted = false;
         this.gamePaused = false; // 新增暂停状态
         this.difficulty = 'normal'; // 默认难度为普通
+        this.twoPlayerMode = false; // 双人模式开关
         this.score = 0;
         // 玩家属性（固定为100，不受难度影响）
         this.health = 100;
@@ -28,6 +29,7 @@ class Game {
         
         // 创建玩家飞机
         this.player = new Player(this.width / 2, this.height - 120);
+        this.player2 = null; // 第二个玩家
         
         // 键盘输入状态
         this.keys = {};
@@ -36,6 +38,7 @@ class Game {
         this.enemySpawnTimer = 0;
         this.powerUpSpawnTimer = 0;
         this.shootTimer = 0;
+        this.shootTimer2 = 0;
         this.bossSpawnTimer = 0;
         
         // 音频
@@ -76,6 +79,11 @@ class Game {
         this.health = 100;
         this.maxHealth = 100;
         
+        // 如果是双人模式，创建第二个玩家
+        if (this.twoPlayerMode) {
+            this.player2 = new Player(this.width / 2 + 30, this.height - 120, true);
+        }
+        
         this.bgMusic.play().catch(e => console.log('音频播放失败:', e));
     }
     
@@ -83,12 +91,25 @@ class Game {
     setDifficulty(difficulty) {
         this.difficulty = difficulty;
         
-        // 更新按钮样式
-        const buttons = document.querySelectorAll('.difficulty-btn');
-        buttons.forEach(btn => {
-            btn.classList.remove('active');
+        // 更新UI按钮状态
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.classList.toggle('active', 
+                (btn.textContent === '简单' && difficulty === 'easy') ||
+                (btn.textContent === '普通' && difficulty === 'normal') ||
+                (btn.textContent === '困难' && difficulty === 'hard')
+            );
         });
-        event.target.classList.add('active');
+    }
+    
+    toggleTwoPlayerMode() {
+        this.twoPlayerMode = !this.twoPlayerMode;
+        
+        // 更新UI按钮状态
+        const btn = document.getElementById('twoPlayerBtn');
+        if (btn) {
+            btn.classList.toggle('active', this.twoPlayerMode);
+            btn.textContent = this.twoPlayerMode ? '双人模式 (开启)' : '双人模式';
+        }
     }
     
     gameLoop() {
@@ -106,14 +127,55 @@ class Game {
         }
         
         // 更新玩家
-        this.player.update(this.keys, this.width, this.height);
+        // 创建第一个玩家的键盘状态（仅使用WASD）
+        const player1Keys = {};
+        player1Keys['w'] = this.keys['w'] || false;
+        player1Keys['s'] = this.keys['s'] || false;
+        player1Keys['a'] = this.keys['a'] || false;
+        player1Keys['d'] = this.keys['d'] || false;
+        this.player.update(player1Keys, this.width, this.height);
+        
+        // 更新第二个玩家（如果存在）
+        if (this.twoPlayerMode && this.player2) {
+            // 创建第二个玩家的键盘状态
+            const player2Keys = {};
+            player2Keys['arrowup'] = this.keys['arrowup'] || false;
+            player2Keys['arrowdown'] = this.keys['arrowdown'] || false;
+            player2Keys['arrowleft'] = this.keys['arrowleft'] || false;
+            player2Keys['arrowright'] = this.keys['arrowright'] || false;
+            this.player2.update(player2Keys, this.width, this.height);
+        }
         
         // 自动射击 - 根据武器等级调整射击频率
         this.shootTimer++;
-        const shootInterval = Math.max(10, 25 - this.weaponLevel * 2);
+        const shootInterval = Math.max(10, 25 - this.player.weaponLevel * 2);
         if (this.shootTimer > shootInterval) {
             this.shoot();
             this.shootTimer = 0;
+        }
+        
+        // 第二个玩家自动射击（如果存在）
+        if (this.twoPlayerMode && this.player2) {
+            // 第二个玩家自动射击
+            if (!this.player2.shootTimer) this.player2.shootTimer = 0;
+            this.player2.shootTimer++;
+            if (this.player2.shootTimer > shootInterval) {
+                const bullets = this.player2.shoot(this.player2.weaponLevel);
+                this.bullets.push(...bullets);
+                
+                // 添加射击粒子效果
+                for (let i = 0; i < 3; i++) {
+                    this.particles.push(new Particle(
+                        this.player2.x + this.player2.width / 2 + (Math.random() - 0.5) * 20,
+                        this.player2.y,
+                        (Math.random() - 0.5) * 2,
+                        -Math.random() * 3,
+                        '#ff0000',
+                        20
+                    ));
+                }
+                this.player2.shootTimer = 0;
+            }
         }
         
         // 更新子弹
@@ -182,7 +244,7 @@ class Game {
     }
     
     shoot() {
-        const bullets = this.player.shoot(this.weaponLevel);
+        const bullets = this.player.shoot(this.player.weaponLevel);
         this.bullets.push(...bullets);
         
         // 添加射击粒子效果
@@ -211,8 +273,13 @@ class Game {
                 baseHealth = 5;
                 break;
             case 'hard':
-                baseHealth = Math.floor(5 * 1.5);
+                baseHealth = Math.floor(5 * 1.5); // 困难模式为普通模式的1.5倍
                 break;
+        }
+        
+        // 如果是双人模式，增加1.5倍血量
+        if (this.twoPlayerMode) {
+            baseHealth = Math.floor(baseHealth * 1.5);
         }
         
         // 计算敌机血量增长：每10秒增加初始血量的一半
@@ -239,13 +306,18 @@ class Game {
                 baseHealth = 23;
                 break;
             case 'hard':
-                baseHealth = Math.floor(23 * 1.5);
+                baseHealth = Math.floor(23 * 1.5); // 困难模式为普通模式的1.5倍
                 break;
         }
         
+        // 如果是双人模式，增加1.5倍血量
+        if (this.twoPlayerMode) {
+            baseHealth = Math.floor(baseHealth * 1.5);
+        }
+        
         // 计算Boss血量增长：每10秒增加初始血量的一半
-        const timeBonus = Math.floor(this.gameTime / 10) * 11.5; // 初始血量23的一半是11.5
-        const bossHealth = 23 + timeBonus;
+        const timeBonus = Math.floor(this.gameTime / 10) * (baseHealth / 2);
+        const bossHealth = baseHealth + timeBonus;
         
         const boss = new Boss(x, -80);
         boss.health = bossHealth;
@@ -333,13 +405,35 @@ class Game {
                     this.gameOver();
                 }
             }
+            
+            // 敌机子弹击中第二个玩家
+            if (this.twoPlayerMode && this.player2 && this.checkCollision(this.enemyBullets[i], this.player2)) {
+                this.enemyBullets.splice(i, 1);
+                this.health -= 15;
+                
+                // 受伤粒子效果
+                for (let k = 0; k < 5; k++) {
+                    this.particles.push(new Particle(
+                        this.player2.x + this.player2.width / 2,
+                        this.player2.y + this.player2.height / 2,
+                        (Math.random() - 0.5) * 4,
+                        (Math.random() - 0.5) * 4,
+                        '#ff0000',
+                        25
+                    ));
+                }
+                
+                if (this.health <= 0) {
+                    this.gameOver();
+                }
+            }
         }
         
         // 玩家碰撞敌机
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.checkCollision(this.player, this.enemies[i])) {
                 this.enemies.splice(i, 1);
-                this.health -= 25;
+                this.health -= 15;
                 
                 // 碰撞爆炸效果
                 for (let k = 0; k < 10; k++) {
@@ -357,22 +451,60 @@ class Game {
                     this.gameOver();
                 }
             }
+            
+            // 第二个玩家碰撞敌机
+            if (this.twoPlayerMode && this.player2 && this.checkCollision(this.player2, this.enemies[i])) {
+                this.enemies.splice(i, 1);
+                this.health -= 15;
+                
+                // 碰撞爆炸效果
+                for (let k = 0; k < 10; k++) {
+                    this.particles.push(new Particle(
+                        this.player2.x + this.player2.width / 2,
+                        this.player2.y + this.player2.height / 2,
+                        (Math.random() - 0.5) * 6,
+                        (Math.random() - 0.5) * 6,
+                        '#ff4400',
+                        40
+                    ));
+                }
+                
+                if (this.health <= 0) {
+                    this.gameOver();
+                }
+            }
         }
         
         // 玩家收集能量豆
         for (let i = this.powerUps.length - 1; i >= 0; i--) {
+            let collected = false;
+            let player = null;
+            
+            // 第一个玩家收集能量豆
             if (this.checkCollision(this.player, this.powerUps[i])) {
                 this.powerUps.splice(i, 1);
-                this.weaponLevel = Math.min(this.weaponLevel + 1, 10);
+                collected = true;
+                player = this.player;
+            }
+            // 第二个玩家收集能量豆
+            else if (this.twoPlayerMode && this.player2 && this.checkCollision(this.player2, this.powerUps[i])) {
+                this.powerUps.splice(i, 1);
+                collected = true;
+                player = this.player2;
+            }
+            
+            if (collected && player) {
+                // 只有吃到能量豆的玩家升级
+                player.weaponLevel = Math.min(player.weaponLevel + 1, 10);
                 
-                // 回复血量
+                // 回复血量（全局血量）
                 this.health = Math.min(this.health + 10, this.maxHealth);
                 
                 // 升级粒子效果
                 for (let k = 0; k < 12; k++) {
                     this.particles.push(new Particle(
-                        this.player.x + this.player.width / 2,
-                        this.player.y + this.player.height / 2,
+                        player.x + player.width / 2,
+                        player.y + player.height / 2,
                         (Math.random() - 0.5) * 4,
                         (Math.random() - 0.5) * 4,
                         '#00ffff',
@@ -383,8 +515,8 @@ class Game {
                 // 回血粒子效果
                 for (let k = 0; k < 8; k++) {
                     this.particles.push(new Particle(
-                        this.player.x + this.player.width / 2,
-                        this.player.y + this.player.height / 2,
+                        player.x + player.width / 2,
+                        player.y + player.height / 2,
                         (Math.random() - 0.5) * 3,
                         (Math.random() - 0.5) * 3,
                         '#00ff00',
@@ -448,6 +580,11 @@ class Game {
         // 绘制游戏对象
         this.player.render(this.ctx);
         
+        // 渲染第二个玩家（如果存在）
+        if (this.twoPlayerMode && this.player2) {
+            this.player2.render(this.ctx);
+        }
+        
         this.bullets.forEach(bullet => bullet.render(this.ctx));
         this.enemyBullets.forEach(bullet => bullet.render(this.ctx));
         this.enemies.forEach(enemy => enemy.render(this.ctx));
@@ -508,20 +645,30 @@ class Particle {
 
 // 玩家飞机类
 class Player {
-    constructor(x, y) {
+    constructor(x, y, isPlayer2 = false) {
         this.x = x;
         this.y = y;
         this.width = 60;
         this.height = 60;
         this.speed = 3;
+        this.isPlayer2 = isPlayer2; // 标记是否为第二个玩家
+        this.weaponLevel = 1; // 独立的武器等级
     }
     
     update(keys, canvasWidth, canvasHeight) {
-        // WASD控制
-        if (keys['w'] && this.y > 0) this.y -= this.speed;
-        if (keys['s'] && this.y < canvasHeight - this.height) this.y += this.speed;
-        if (keys['a'] && this.x > 0) this.x -= this.speed;
-        if (keys['d'] && this.x < canvasWidth - this.width) this.x += this.speed;
+        if (this.isPlayer2) {
+            // 第二个玩家使用箭头键
+            if (keys['arrowup'] && this.y > 0) this.y -= this.speed;
+            if (keys['arrowdown'] && this.y < canvasHeight - this.height) this.y += this.speed;
+            if (keys['arrowleft'] && this.x > 0) this.x -= this.speed;
+            if (keys['arrowright'] && this.x < canvasWidth - this.width) this.x += this.speed;
+        } else {
+            // 第一个玩家使用WASD
+            if (keys['w'] && this.y > 0) this.y -= this.speed;
+            if (keys['s'] && this.y < canvasHeight - this.height) this.y += this.speed;
+            if (keys['a'] && this.x > 0) this.x -= this.speed;
+            if (keys['d'] && this.x < canvasWidth - this.width) this.x += this.speed;
+        }
     }
     
     shoot(weaponLevel) {
@@ -602,16 +749,22 @@ class Player {
     }
     
     render(ctx) {
+        // 根据是否为第二个玩家选择颜色
+        const mainColor = this.isPlayer2 ? '#ff0000' : '#00ff00';
+        const wingColor = this.isPlayer2 ? '#cc0000' : '#00cc00';
+        const engineColor = this.isPlayer2 ? '#ff9999' : '#ffff00';
+        const shieldColor = this.isPlayer2 ? '#ff00ff' : '#00ffff';
+        
         // 绘制飞机主体 - 增大尺寸
-        ctx.fillStyle = '#00ff00';
+        ctx.fillStyle = mainColor;
         ctx.fillRect(this.x + 22, this.y + 45, 16, 15);
         
         // 绘制机翼
-        ctx.fillStyle = '#00cc00';
+        ctx.fillStyle = wingColor;
         ctx.fillRect(this.x, this.y + 30, 60, 12);
         
         // 绘制机头
-        ctx.fillStyle = '#00ff00';
+        ctx.fillStyle = mainColor;
         ctx.beginPath();
         ctx.moveTo(this.x + 30, this.y);
         ctx.lineTo(this.x + 15, this.y + 30);
@@ -620,12 +773,12 @@ class Player {
         ctx.fill();
         
         // 绘制引擎光效
-        ctx.fillStyle = '#ffff00';
+        ctx.fillStyle = engineColor;
         ctx.fillRect(this.x + 12, this.y + 60, 9, 12);
         ctx.fillRect(this.x + 39, this.y + 60, 9, 12);
         
         // 绘制护盾效果
-        ctx.strokeStyle = '#00ffff';
+        ctx.strokeStyle = shieldColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 35, 0, Math.PI * 2);
@@ -1034,8 +1187,68 @@ class PowerUp {
 
 // 重新开始游戏函数
 function restartGame() {
-    // 重新加载页面来重启游戏
-    location.reload();
+    const game = window.gameInstance;
+    if (game) {
+        // 停止背景音乐
+        game.bgMusic.pause();
+        game.bgMusic.currentTime = 0;
+        
+        // 保存当前难度和双人模式状态
+        const currentDifficulty = game.difficulty;
+        const currentTwoPlayerMode = game.twoPlayerMode;
+        
+        // 重置游戏状态
+        game.gameRunning = false;
+        game.gameStarted = false;
+        game.gamePaused = false;
+        game.score = 0;
+        game.health = 100;
+        game.maxHealth = 100;
+        game.weaponLevel = 1;
+        game.gameStartTime = 0;
+        game.gameTime = 0;
+        
+        // 清空所有游戏对象
+        game.bullets = [];
+        game.enemies = [];
+        game.powerUps = [];
+        game.enemyBullets = [];
+        game.particles = [];
+        
+        // 重置玩家位置
+        game.player.x = game.width / 2;
+        game.player.y = game.height - 120;
+        game.player.weaponLevel = 1; // 重置玩家武器等级
+        game.player2 = null;
+        
+        // 重置计时器
+        game.enemySpawnTimer = 0;
+        game.powerUpSpawnTimer = 0;
+        game.shootTimer = 0;
+        game.shootTimer2 = 0;
+        game.bossSpawnTimer = 0;
+        
+        // 重新应用保存的难度和双人模式
+        game.setDifficulty(currentDifficulty);
+        game.twoPlayerMode = currentTwoPlayerMode;
+        
+        // 如果双人模式开启，创建第二个玩家并设置武器等级
+        if (game.twoPlayerMode) {
+            game.player2 = new Player(game.width / 2 + 30, game.height - 120, true);
+            game.player2.weaponLevel = 1; // 重置第二个玩家武器等级
+        }
+        
+        // 更新UI状态
+        document.getElementById('difficultySelector').style.display = 'flex';
+        document.getElementById('pauseBtn').style.display = 'none';
+        
+        // 更新双人模式按钮状态
+        const twoPlayerBtn = document.querySelector('.two-player-toggle button');
+        if (twoPlayerBtn) {
+            twoPlayerBtn.textContent = game.twoPlayerMode ? '关闭双人' : '双人模式';
+            twoPlayerBtn.classList.toggle('active', game.twoPlayerMode);
+        }
+    }
 }
 
 // 暂停/继续游戏函数
@@ -1072,7 +1285,31 @@ function setDifficulty(difficulty) {
     window.gameInstance.setDifficulty(difficulty);
 }
 
+// 全局函数用于切换双人模式
+function toggleTwoPlayerMode() {
+    if (window.gameInstance) {
+        window.gameInstance.toggleTwoPlayerMode();
+    }
+}
+
 // 启动游戏
 window.addEventListener('load', () => {
     window.gameInstance = new Game(); // 将游戏实例存储为全局变量
 });
+
+// 规则弹窗功能
+function showRules() {
+    document.getElementById('rulesModal').style.display = 'block';
+}
+
+function closeRules() {
+    document.getElementById('rulesModal').style.display = 'none';
+}
+
+// 点击模态框外部关闭
+window.onclick = function(event) {
+    const modal = document.getElementById('rulesModal');
+    if (event.target == modal) {
+        modal.style.display = 'none';
+    }
+}

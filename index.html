@@ -48,28 +48,77 @@
             font-size: 14px;
         }
         
-        /* 难度选择样式 */
-        .difficulty-selector {
-            position: absolute;
-            top: 120px;
-            right: -120px;
-            width: 120px;
+        /* 按钮容器样式 */
+        .buttons-container {
+            position: fixed;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, rgba(0, 10, 20, 0.8), rgba(0, 20, 40, 0.8));
+            border: 2px solid #0088aa;
+            border-radius: 15px;
+            padding: 25px 20px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 100;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            z-index: 10;
+            gap: 15px;
             align-items: center;
+            min-width: 160px;
+        }
+        
+        .buttons-container h3 {
+            color: #00ffff;
+            text-align: center;
+            margin: 0 0 20px 0;
+            font-size: 19px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+        
+        .buttons-container h4 {
+            color: #00ff88;
+            text-align: center;
+            margin: 15px 0 10px 0;
+            font-size: 15px;
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+        }
+        
+        /* 难度选择样式 */
+        .difficulty-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        
+        .two-player-toggle {
+            margin-top: 15px;
+        }   align-items: center;
+            width: 100%;
+        }
+        
+        .two-player-toggle {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+            width: 100%;
         }
         
         .difficulty-btn {
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: 2px solid #00ffff;
             background: transparent;
             color: #00ffff;
-            font-size: 14px;
+            font-size: 15px;
             cursor: pointer;
-            border-radius: 5px;
+            border-radius: 8px;
             transition: all 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .difficulty-btn:hover {
@@ -83,23 +132,30 @@
         }
         
         .restart-button {
-            position: absolute;
-            top: 10px;
-            right: -120px;
-            width: 120px;
+            width: 100%;
             text-align: center;
             display: flex;
             justify-content: center;
         }
         
         .pause-button {
-            position: absolute;
-            top: 60px;
-            right: -120px;
-            width: 120px;
+            width: 100%;
             text-align: center;
             display: flex;
             justify-content: center;
+        }
+        
+        .restart-button button {
+            background: linear-gradient(45deg, #00ff00, #00aa00);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 255, 0, 0.3);
+            transition: all 0.3s ease;
+            width: 100%;
         }
         
         .pause-button button {
@@ -107,17 +163,113 @@
             color: white;
             border: none;
             padding: 12px 24px;
-            font-size: 16px;
+            font-size: 15px;
             border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
             transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .restart-button button:hover {
+            background: linear-gradient(45deg, #00cc00, #008800);
+            box-shadow: 0 6px 20px rgba(0, 255, 0, 0.5);
+            transform: translateY(-2px);
         }
         
         .pause-button button:hover {
             background: linear-gradient(45deg, #00cccc, #0055cc);
             box-shadow: 0 6px 20px rgba(0, 255, 255, 0.5);
             transform: translateY(-2px);
+        }
+        
+        .rules-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .rules-button button {
+            background: linear-gradient(45deg, #00ffff, #0066ff);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .rules-button button:hover {
+            background: linear-gradient(45deg, #00cccc, #0055cc);
+            box-shadow: 0 6px 20px rgba(0, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .rules-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        
+        .rules-content {
+            background: linear-gradient(135deg, #001122, #003366);
+            margin: 5% auto;
+            padding: 30px;
+            border: 2px solid #00ffff;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 600px;
+            color: #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .rules-content h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .rules-content h3 {
+            color: #00ff00;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .rules-content p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        
+        .rules-content ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .rules-content li {
+            margin: 5px 0;
+        }
+        
+        .close-rules {
+            color: #00ffff;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        
+        .close-rules:hover {
+            color: #ff0000;
         }
         
         .restart-button button {
@@ -148,26 +300,101 @@
             <div>武器等级: <span id="weaponLevel">1</span></div>
             <div>游戏时长: <span id="gameTime">00:00</span></div>
         </div>
-        <div class="difficulty-selector" id="difficultySelector">
-            <button class="difficulty-btn active" onclick="setDifficulty('easy')">简单</button>
-            <button class="difficulty-btn" onclick="setDifficulty('normal')">普通</button>
-            <button class="difficulty-btn" onclick="setDifficulty('hard')">困难</button>
+        
+        <!-- 按钮容器 - 游戏外部右方 -->
+        <div class="buttons-container">
+            <h3>游戏控制</h3>
+            <div class="restart-button" id="restartButton">
+                <button onclick="restartGame()">重新开始</button>
+            </div>
+            <div class="pause-button" id="pauseButton">
+                <button onclick="togglePause()">暂停/继续</button>
+            </div>
+            <div class="difficulty-selector" id="difficultySelector">
+                <h4>难度选择</h4>
+                <button class="difficulty-btn active" onclick="setDifficulty('easy')">简单</button>
+                <button class="difficulty-btn" onclick="setDifficulty('normal')">普通</button>
+                <button class="difficulty-btn" onclick="setDifficulty('hard')">困难</button>
+            </div>
+            <div class="two-player-toggle">
+                <button id="twoPlayerBtn" class="difficulty-btn" onclick="toggleTwoPlayerMode()">双人模式</button>
+            </div>
         </div>
+        
         <div class="controls">
             使用 WASD 键控制飞机移动 | 点击屏幕开始游戏
         </div>
-        <div class="restart-button" id="restartButton">
-            <button onclick="restartGame()">重新开始</button>
-        </div>
-        <div class="pause-button" id="pauseButton">
-            <button onclick="togglePause()">暂停/继续</button>
-        </div>
+    </div>
+    
+    <!-- 规则按钮 - 游戏外部右下角 -->
+    <div class="rules-button">
+        <button onclick="showRules()">规则</button>
     </div>
     
     <!-- 背景音乐和音效 -->
     <audio id="bgMusic" loop>
         <source src="bgm/KOTOKO - jihad.mp3" type="audio/mpeg">
     </audio>
+    
+    <!-- 规则弹窗 -->
+    <div id="rulesModal" class="rules-modal">
+        <div class="rules-content">
+            <span class="close-rules" onclick="closeRules()">&times;</span>
+            <h2>游戏规则</h2>
+            
+            <h3>🎮 操作方式</h3>
+            <p><strong>单人模式：</strong></p>
+            <ul>
+                <li>WASD 键控制飞机移动</li>
+                <li>自动射击，无需按键</li>
+            </ul>
+            
+            <p><strong>双人模式：</strong></p>
+            <ul>
+                <li>玩家1：WASD 键控制移动</li>
+                <li>玩家2：方向键（↑↓←→）控制移动</li>
+                <li>两个玩家都可以自动射击</li>
+            </ul>
+            
+            <h3>⚡ 能量豆系统</h3>
+            <ul>
+                <li>绿色能量豆：提升武器等级</li>
+                <li>红色能量豆：恢复生命值</li>
+                <li>每个玩家有独立的武器等级</li>
+                <li>只有吃到能量豆的玩家会升级武器</li>
+            </ul>
+            
+            <h3>🔫 武器升级</h3>
+            <ul>
+                <li>等级1：单发子弹</li>
+                <li>等级2：双发子弹</li>
+                <li>等级3：三发子弹</li>
+                <li>等级4：扇形散射子弹</li>
+                <li>等级5：强力激光束</li>
+            </ul>
+            
+            <h3>💥 战斗系统</h3>
+            <ul>
+                <li>击中敌机获得分数</li>
+                <li>碰撞敌机扣除生命值（单人25点，双人15点）</li>
+                <li>敌机子弹击中扣除15点生命值</li>
+                <li><strong>击败BOSS会提升血量上限</strong></li>
+                <li><strong>敌机血量每10秒提升初始血量的一半</strong></li>
+                <li>生命值归零游戏结束</li>
+            </ul>
+            
+            <h3>🎯 难度选择</h3>
+            <ul>
+                <li>简单：敌机血量少（速度不变）</li>
+                <li>普通：标准游戏难度</li>
+                <li>困难：敌机血量多（速度不变）</li>
+                <li><strong>注意：难度选择不会改变敌机速度</strong></li>
+            </ul>
+            
+            <h3>🏆 游戏目标</h3>
+            <p>尽可能存活更长时间，获得更高分数，挑战更高难度！</p>
+        </div>
+    </div>
     
     <script src="game.js"></script>
 </body>
