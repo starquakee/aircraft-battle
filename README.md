@@ -133,11 +133,7 @@ aircraft_battle/
    ```
 3. 使用下面的命令进行打包（确保在项目根目录下执行）：
    ```powershell
-   pyinstaller --noconfirm --onefile --name AircraftBattle \
-     --add-data "index.html;." \
-     --add-data "game.js;." \
-     --add-data "bgm\\KOTOKO - jihad.mp3;bgm" \
-     --add-data "picture\\demo.png;picture" start.py
+   pyinstaller --noconfirm --onefile --name AircraftBattle --add-data "index.html;." --add-data "game.js;." --add-data "bgm\KOTOKO - jihad.mp3;bgm" --add-data "picture\demo.png;picture" start.py
    ```
    - 打包完成后，`dist\AircraftBattle.exe` 即可双击运行
    - 程序会自动启动本地服务器并打开默认浏览器访问游戏页面
