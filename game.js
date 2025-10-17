@@ -45,6 +45,11 @@ class Game {
         this.bgMusic = document.getElementById('bgMusic');
         this.bgMusic.volume = 0.3;
         
+        // 时间戳记录（用于deltaTime计算）
+        this.lastTime = 0;
+        this.deltaTime = 0;
+        this.targetFPS = 60; // 目标帧率
+        
         this.init();
     }
     
@@ -112,15 +117,25 @@ class Game {
         }
     }
     
-    gameLoop() {
+    gameLoop(currentTime) {
+        // 计算时间差（秒）
+        if (this.lastTime === 0) {
+            this.lastTime = currentTime;
+        }
+        this.deltaTime = (currentTime - this.lastTime) / 1000;
+        this.lastTime = currentTime;
+        
+        // 限制最大deltaTime，防止卡顿导致的跳跃
+        this.deltaTime = Math.min(this.deltaTime, 0.05); // 最大50ms
+        
         if (this.gameRunning && !this.gamePaused) {
-            this.update();
+            this.update(this.deltaTime);
         }
         this.render();
-        requestAnimationFrame(() => this.gameLoop());
+        requestAnimationFrame((time) => this.gameLoop(time));
     }
     
-    update() {
+    update(deltaTime) {
         // 更新游戏时间
         if (this.gameStartTime > 0) {
             this.gameTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
@@ -133,7 +148,7 @@ class Game {
         player1Keys['s'] = this.keys['s'] || false;
         player1Keys['a'] = this.keys['a'] || false;
         player1Keys['d'] = this.keys['d'] || false;
-        this.player.update(player1Keys, this.width, this.height);
+        this.player.update(player1Keys, this.width, this.height, deltaTime);
         
         // 更新第二个玩家（如果存在）
         if (this.twoPlayerMode && this.player2) {
@@ -143,12 +158,12 @@ class Game {
             player2Keys['arrowdown'] = this.keys['arrowdown'] || false;
             player2Keys['arrowleft'] = this.keys['arrowleft'] || false;
             player2Keys['arrowright'] = this.keys['arrowright'] || false;
-            this.player2.update(player2Keys, this.width, this.height);
+            this.player2.update(player2Keys, this.width, this.height, deltaTime);
         }
         
         // 自动射击 - 根据武器等级调整射击频率
-        this.shootTimer++;
-        const shootInterval = Math.max(10, 25 - this.player.weaponLevel * 2);
+        this.shootTimer += deltaTime * 60;
+        const shootInterval = Math.max(3, Math.floor((25 - this.player.weaponLevel * 2) / 3)); // 射速提升3倍：间隔缩短为1/3
         if (this.shootTimer > shootInterval) {
             this.shoot();
             this.shootTimer = 0;
@@ -158,7 +173,7 @@ class Game {
         if (this.twoPlayerMode && this.player2) {
             // 第二个玩家自动射击
             if (!this.player2.shootTimer) this.player2.shootTimer = 0;
-            this.player2.shootTimer++;
+            this.player2.shootTimer += deltaTime * 60;
             if (this.player2.shootTimer > shootInterval) {
                 const bullets = this.player2.shoot(this.player2.weaponLevel);
                 this.bullets.push(...bullets);
@@ -168,8 +183,8 @@ class Game {
                     this.particles.push(new Particle(
                         this.player2.x + this.player2.width / 2 + (Math.random() - 0.5) * 20,
                         this.player2.y,
-                        (Math.random() - 0.5) * 2,
-                        -Math.random() * 3,
+                        (Math.random() - 0.5) * 6, // 速度再提升1.5倍：从4变为6
+                        -Math.random() * 9, // 速度再提升1.5倍：从6变为9
                         '#ff0000',
                         20
                     ));
@@ -180,31 +195,31 @@ class Game {
         
         // 更新子弹
         this.bullets = this.bullets.filter(bullet => {
-            bullet.update();
+            bullet.update(deltaTime);
             return bullet.y > -20 && bullet.x > -50 && bullet.x < this.width + 50;
         });
         
         // 更新敌机子弹
         this.enemyBullets = this.enemyBullets.filter(bullet => {
-            bullet.update();
+            bullet.update(deltaTime);
             return bullet.y < this.height + 20;
         });
         
         // 更新粒子效果
         this.particles = this.particles.filter(particle => {
-            particle.update();
+            particle.update(deltaTime);
             return particle.life > 0;
         });
         
         // 生成敌机
-        this.enemySpawnTimer++;
+        this.enemySpawnTimer += deltaTime * 60;
         if (this.enemySpawnTimer > 200) {
             this.spawnEnemy();
             this.enemySpawnTimer = 0;
         }
         
         // 生成Boss
-        this.bossSpawnTimer++;
+        this.bossSpawnTimer += deltaTime * 60;
         if (this.bossSpawnTimer > 2400 && Math.random() < 0.3) { // 40秒后有30%概率生成Boss
             this.spawnBoss();
             this.bossSpawnTimer = 0;
@@ -212,19 +227,30 @@ class Game {
         
         // 更新敌机
         this.enemies = this.enemies.filter(enemy => {
-            enemy.update(this.player.x, this.player.y);
+            enemy.update(deltaTime);
             
             // Boss射击
-            if (enemy.isBoss && enemy.shootTimer++ > 80) {
-                this.enemyBullets.push(...enemy.shoot(this.player.x, this.player.y));
-                enemy.shootTimer = 0;
+            if (enemy.isBoss) {
+                if (!enemy.shootTimer) enemy.shootTimer = 0;
+                enemy.shootTimer += deltaTime * 60;
+                if (enemy.shootTimer > 80) {
+                    // Boss射击目标：使用敌机预先确定的目标玩家
+                    let targetX = this.player.x;
+                    let targetY = this.player.y;
+                    if (enemy.targetPlayer) {
+                        targetX = enemy.targetPlayer.x;
+                        targetY = enemy.targetPlayer.y;
+                    }
+                    this.enemyBullets.push(...enemy.shoot(targetX, targetY));
+                    enemy.shootTimer = 0;
+                }
             }
             
             return enemy.y < this.height + 100 && enemy.health > 0;
         });
         
         // 生成能量豆
-        this.powerUpSpawnTimer++;
+        this.powerUpSpawnTimer += deltaTime * 60;
         if (this.powerUpSpawnTimer > 1000) {
             this.spawnPowerUp();
             this.powerUpSpawnTimer = 0;
@@ -232,7 +258,7 @@ class Game {
         
         // 更新能量豆
         this.powerUps = this.powerUps.filter(powerUp => {
-            powerUp.update(this.width, this.height);
+            powerUp.update(this.width, this.height, deltaTime);
             return powerUp.active;
         });
         
@@ -252,8 +278,8 @@ class Game {
             this.particles.push(new Particle(
                 this.player.x + this.player.width / 2 + (Math.random() - 0.5) * 20,
                 this.player.y,
-                (Math.random() - 0.5) * 2,
-                -Math.random() * 3,
+                (Math.random() - 0.5) * 6, // 速度再提升1.5倍：从4变为6
+                -Math.random() * 9, // 速度再提升1.5倍：从6变为9
                 '#ffff00',
                 20
             ));
@@ -286,7 +312,13 @@ class Game {
         const timeBonus = Math.floor(this.gameTime / 10) * (baseHealth / 2);
         const enemyHealth = baseHealth + timeBonus;
         
-        const enemy = new Enemy(x, -50);
+        // 双人模式下随机选择目标玩家
+        let targetPlayer = this.player;
+        if (this.twoPlayerMode && this.player2 && Math.random() < 0.5) {
+            targetPlayer = this.player2;
+        }
+        
+        const enemy = new Enemy(x, -50, targetPlayer);
         enemy.health = enemyHealth;
         enemy.maxHealth = enemyHealth;
         
@@ -319,7 +351,13 @@ class Game {
         const timeBonus = Math.floor(this.gameTime / 10) * (baseHealth / 2);
         const bossHealth = baseHealth + timeBonus;
         
-        const boss = new Boss(x, -80);
+        // 双人模式下随机选择目标玩家
+        let targetPlayer = this.player;
+        if (this.twoPlayerMode && this.player2 && Math.random() < 0.5) {
+            targetPlayer = this.player2;
+        }
+        
+        const boss = new Boss(x, -80, targetPlayer);
         boss.health = bossHealth;
         boss.maxHealth = bossHealth;
         
@@ -341,15 +379,15 @@ class Game {
                     
                     // 添加爆炸粒子效果
                     for (let k = 0; k < 8; k++) {
-                        this.particles.push(new Particle(
-                            this.bullets[i].x,
-                            this.bullets[i].y,
-                            (Math.random() - 0.5) * 6,
-                            (Math.random() - 0.5) * 6,
-                            '#ff6600',
-                            30
-                        ));
-                    }
+                            this.particles.push(new Particle(
+                                this.bullets[i].x,
+                                this.bullets[i].y,
+                                (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+                                 (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+                                '#ff6600',
+                                30
+                            ));
+                        }
                     
                     this.bullets.splice(i, 1);
                     this.enemies[j].takeDamage(1);
@@ -364,15 +402,15 @@ class Game {
                             this.health = Math.min(this.health + 5, this.maxHealth); // 同时回复5点血量
                         }
                         
-                        // 死亡爆炸效果
-                        for (let k = 0; k < 15; k++) {
+                        // Boss死亡爆炸效果
+                        for (let k = 0; k < 30; k++) {
                             this.particles.push(new Particle(
                                 this.enemies[j].x + this.enemies[j].width / 2,
                                 this.enemies[j].y + this.enemies[j].height / 2,
-                                (Math.random() - 0.5) * 8,
-                                (Math.random() - 0.5) * 8,
+                                (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+                                 (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
                                 '#ff0000',
-                                50
+                                80
                             ));
                         }
                         
@@ -629,11 +667,11 @@ class Particle {
         this.maxLife = life;
     }
     
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.life--;
-        this.vy += 0.1; // 重力效果
+    update(deltaTime) {
+        this.x += this.vx * deltaTime * 60;
+        this.y += this.vy * deltaTime * 60;
+        this.life -= deltaTime * 60; // 基于时间减少生命值
+        this.vy += 0.3 * deltaTime * 60; // 重力效果再提升1.5倍：从0.2变为0.3
     }
     
     render(ctx) {
@@ -650,24 +688,27 @@ class Player {
         this.y = y;
         this.width = 60;
         this.height = 60;
-        this.speed = 3;
+        this.speed = 9; // 速度再提升1.5倍：从6变为9
         this.isPlayer2 = isPlayer2; // 标记是否为第二个玩家
         this.weaponLevel = 1; // 独立的武器等级
     }
     
-    update(keys, canvasWidth, canvasHeight) {
+    update(keys, canvasWidth, canvasHeight, deltaTime = 1/60) {
+        // 基于时间的移动速度（像素/秒）
+        const moveSpeed = this.speed * deltaTime * 60; // 60fps为基准
+        
         if (this.isPlayer2) {
             // 第二个玩家使用箭头键
-            if (keys['arrowup'] && this.y > 0) this.y -= this.speed;
-            if (keys['arrowdown'] && this.y < canvasHeight - this.height) this.y += this.speed;
-            if (keys['arrowleft'] && this.x > 0) this.x -= this.speed;
-            if (keys['arrowright'] && this.x < canvasWidth - this.width) this.x += this.speed;
+            if (keys['arrowup'] && this.y > 0) this.y -= moveSpeed;
+            if (keys['arrowdown'] && this.y < canvasHeight - this.height) this.y += moveSpeed;
+            if (keys['arrowleft'] && this.x > 0) this.x -= moveSpeed;
+            if (keys['arrowright'] && this.x < canvasWidth - this.width) this.x += moveSpeed;
         } else {
             // 第一个玩家使用WASD
-            if (keys['w'] && this.y > 0) this.y -= this.speed;
-            if (keys['s'] && this.y < canvasHeight - this.height) this.y += this.speed;
-            if (keys['a'] && this.x > 0) this.x -= this.speed;
-            if (keys['d'] && this.x < canvasWidth - this.width) this.x += this.speed;
+            if (keys['w'] && this.y > 0) this.y -= moveSpeed;
+            if (keys['s'] && this.y < canvasHeight - this.height) this.y += moveSpeed;
+            if (keys['a'] && this.x > 0) this.x -= moveSpeed;
+            if (keys['d'] && this.x < canvasWidth - this.width) this.x += moveSpeed;
         }
     }
     
@@ -793,7 +834,7 @@ class Bullet {
         this.y = y;
         this.width = 4;
         this.height = 12;
-        this.speed = 6;
+        this.speed = 18; // 速度再提升1.5倍：从12变为18
         this.angle = angle;
         this.type = type;
         this.vx = Math.sin(angle) * this.speed;
@@ -805,22 +846,22 @@ class Bullet {
             case 'enhanced':
                 this.width = 6;
                 this.height = 16;
-                this.speed = 7;
+                this.speed = 21; // 速度再提升1.5倍：从14变为21
                 break;
             case 'laser':
                 this.width = 3;
                 this.height = 20;
-                this.speed = 9;
+                this.speed = 27; // 速度再提升1.5倍：从18变为27
                 break;
             case 'spiral':
                 this.width = 5;
                 this.height = 8;
-                this.speed = 5;
+                this.speed = 15; // 速度再提升1.5倍：从10变为15
                 break;
             case 'ultimate':
                 this.width = 8;
                 this.height = 24;
-                this.speed = 8;
+                this.speed = 24; // 速度再提升1.5倍：从16变为24
                 break;
         }
         
@@ -828,7 +869,7 @@ class Bullet {
         this.vy = -this.speed;
     }
     
-    update() {
+    update(deltaTime) {
         this.time++;
         
         if (this.type === 'spiral') {
@@ -836,8 +877,9 @@ class Bullet {
             this.vx = Math.sin(this.angle + this.time * 0.1) * this.speed * 0.8;
         }
         
-        this.x += this.vx;
-        this.y += this.vy;
+        // 基于时间更新位置
+        this.x += this.vx * deltaTime * 60;
+        this.y += this.vy * deltaTime * 60;
     }
     
     render(ctx) {
@@ -924,9 +966,10 @@ class EnemyBullet {
         this.vy = vy;
     }
     
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
+    update(deltaTime) {
+        // 基于时间更新位置
+        this.x += this.vx * deltaTime * 60;
+        this.y += this.vy * deltaTime * 60;
     }
     
     render(ctx) {
@@ -939,26 +982,31 @@ class EnemyBullet {
 
 // 敌机类
 class Enemy {
-    constructor(x, y) {
+    constructor(x, y, targetPlayer = null) {
         this.x = x;
         this.y = y;
         this.width = 40;
         this.height = 40;
-        this.speed = 1;
-        this.moveSpeed = 0.5;
+        this.speed = 3; // 速度再提升1.5倍：从2变为3
+        this.moveSpeed = 1.5; // 速度再提升1.5倍：从1变为1.5
         this.health = 5;  // 3 * 1.5 = 4.5，向上取整为5
         this.maxHealth = 5;
         this.isBoss = false;
+        this.targetPlayer = targetPlayer; // 目标玩家对象，在生成时确定
     }
     
-    update(playerX, playerY) {
-        this.y += this.speed;
+    update(deltaTime) {
+        // 基于时间更新位置
+        this.y += this.speed * deltaTime * 60;
         
-        // 向玩家靠拢
-        if (this.x < playerX) {
-            this.x += this.moveSpeed;
-        } else if (this.x > playerX) {
-            this.x -= this.moveSpeed;
+        // 如果有目标玩家，向其靠拢
+        if (this.targetPlayer) {
+            const targetX = this.targetPlayer.x + this.targetPlayer.width / 2;
+            if (this.x < targetX) {
+                this.x += this.moveSpeed * deltaTime * 60;
+            } else if (this.x > targetX) {
+                this.x -= this.moveSpeed * deltaTime * 60;
+            }
         }
     }
     
@@ -999,22 +1047,22 @@ class Enemy {
 
 // Boss类
 class Boss extends Enemy {
-    constructor(x, y) {
-        super(x, y);
+    constructor(x, y, targetPlayer = null) {
+        super(x, y, targetPlayer);
         this.width = 80;
         this.height = 60;
         this.health = 23;  // 15 * 1.5 = 22.5，向上取整为23
         this.maxHealth = 23;
-        this.speed = 0.5;
-        this.moveSpeed = 0.3;
+        this.speed = 1.5; // 速度再提升1.5倍：从1变为1.5
+        this.moveSpeed = 0.9; // 速度再提升1.5倍：从0.6变为0.9
         this.isBoss = true;
         this.shootTimer = 0;
         this.movePattern = 0;
         this.moveTimer = 0;
     }
     
-    update(playerX, playerY) {
-        this.moveTimer++;
+    update(deltaTime) {
+        this.moveTimer += deltaTime * 60; // 基于时间更新计时器
         
         // Boss移动模式
         if (this.moveTimer > 120) {
@@ -1024,17 +1072,20 @@ class Boss extends Enemy {
         
         switch (this.movePattern) {
             case 0: // 向玩家靠拢
-                if (this.x < playerX) {
-                    this.x += this.moveSpeed;
-                } else if (this.x > playerX) {
-                    this.x -= this.moveSpeed;
+                if (this.targetPlayer) {
+                    const targetX = this.targetPlayer.x + this.targetPlayer.width / 2;
+                    if (this.x < targetX) {
+                        this.x += this.moveSpeed * deltaTime * 60;
+                    } else if (this.x > targetX) {
+                        this.x -= this.moveSpeed * deltaTime * 60;
+                    }
                 }
                 break;
             case 1: // 左右移动
-                this.x += Math.sin(this.moveTimer * 0.1) * 2;
+                this.x += Math.sin(this.moveTimer * 0.1) * 6 * deltaTime * 60; // 速度再提升1.5倍：从4变为6
                 break;
             case 2: // 下降
-                this.y += this.speed;
+                this.y += this.speed * deltaTime * 60;
                 break;
         }
         
@@ -1116,18 +1167,18 @@ class PowerUp {
         this.y = y;
         this.width = 25;
         this.height = 25;
-        this.speed = 1;
+        this.speed = 6; // 速度再提升1.5倍：从4变为6
         this.rotation = 0;
         this.active = true;
-        this.vx = (Math.random() - 0.5) * 2;
-        this.vy = (Math.random() - 0.5) * 2;
+        this.vx = (Math.random() - 0.5) * 6; // 速度再提升1.5倍：从4变为6
+        this.vy = (Math.random() - 0.5) * 6; // 速度再提升1.5倍：从4变为6
         this.bounceTimer = 0;
     }
     
-    update(canvasWidth, canvasHeight) {
+    update(canvasWidth, canvasHeight, deltaTime) {
         // 随机移动
-        this.x += this.vx;
-        this.y += this.vy;
+        this.x += this.vx * deltaTime * 60;
+        this.y += this.vy * deltaTime * 60;
         
         // 边界反弹
         if (this.x <= 0 || this.x >= canvasWidth - this.width) {
@@ -1138,7 +1189,7 @@ class PowerUp {
         }
         
         // 随机改变方向
-        this.bounceTimer++;
+        this.bounceTimer += deltaTime * 60;
         if (this.bounceTimer > 120) {
             this.vx += (Math.random() - 0.5) * 0.5;
             this.vy += (Math.random() - 0.5) * 0.5;
@@ -1147,7 +1198,7 @@ class PowerUp {
             this.bounceTimer = 0;
         }
         
-        this.rotation += 0.05;
+        this.rotation += 0.05 * deltaTime * 60;
     }
     
     render(ctx) {
