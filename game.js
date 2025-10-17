@@ -9,7 +9,10 @@ class Game {
         // 游戏状态
         this.gameRunning = false;
         this.gameStarted = false;
+        this.gamePaused = false; // 新增暂停状态
+        this.difficulty = 'normal'; // 默认难度为普通
         this.score = 0;
+        // 玩家属性（固定为100，不受难度影响）
         this.health = 100;
         this.maxHealth = 100;
         this.weaponLevel = 1;
@@ -66,13 +69,30 @@ class Game {
     startGame() {
         this.gameStarted = true;
         this.gameRunning = true;
+        this.gamePaused = false; // 确保游戏开始时不是暂停状态
         this.gameStartTime = Date.now();
+        
+        // 玩家血量固定为100，不受难度影响
+        this.health = 100;
+        this.maxHealth = 100;
         
         this.bgMusic.play().catch(e => console.log('音频播放失败:', e));
     }
     
+    // 设置难度模式
+    setDifficulty(difficulty) {
+        this.difficulty = difficulty;
+        
+        // 更新按钮样式
+        const buttons = document.querySelectorAll('.difficulty-btn');
+        buttons.forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+    }
+    
     gameLoop() {
-        if (this.gameRunning) {
+        if (this.gameRunning && !this.gamePaused) {
             this.update();
         }
         this.render();
@@ -181,9 +201,23 @@ class Game {
     spawnEnemy() {
         const x = Math.random() * (this.width - 50);
         
+        // 根据难度计算敌机初始血量
+        let baseHealth = 5;
+        switch(this.difficulty) {
+            case 'easy':
+                baseHealth = Math.floor(5 * 0.65);
+                break;
+            case 'normal':
+                baseHealth = 5;
+                break;
+            case 'hard':
+                baseHealth = Math.floor(5 * 1.5);
+                break;
+        }
+        
         // 计算敌机血量增长：每10秒增加初始血量的一半
-        const timeBonus = Math.floor(this.gameTime / 10) * 2.5; // 初始血量5的一半是2.5
-        const enemyHealth = 5 + timeBonus;
+        const timeBonus = Math.floor(this.gameTime / 10) * (baseHealth / 2);
+        const enemyHealth = baseHealth + timeBonus;
         
         const enemy = new Enemy(x, -50);
         enemy.health = enemyHealth;
@@ -194,6 +228,20 @@ class Game {
     
     spawnBoss() {
         const x = this.width / 2 - 40;
+        
+        // 根据难度计算Boss初始血量
+        let baseHealth = 23;
+        switch(this.difficulty) {
+            case 'easy':
+                baseHealth = Math.floor(23 * 0.65);
+                break;
+            case 'normal':
+                baseHealth = 23;
+                break;
+            case 'hard':
+                baseHealth = Math.floor(23 * 1.5);
+                break;
+        }
         
         // 计算Boss血量增长：每10秒增加初始血量的一半
         const timeBonus = Math.floor(this.gameTime / 10) * 11.5; // 初始血量23的一半是11.5
@@ -990,7 +1038,41 @@ function restartGame() {
     location.reload();
 }
 
+// 暂停/继续游戏函数
+function togglePause() {
+    // 获取游戏实例
+    const game = window.gameInstance;
+    
+    if (!game.gameStarted) return; // 如果游戏未开始，则不执行任何操作
+    
+    game.gamePaused = !game.gamePaused;
+    
+    // 如果游戏暂停，显示提示信息
+    if (game.gamePaused) {
+        // 在画布中央显示"游戏暂停"文本
+        game.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        game.ctx.fillRect(0, 0, game.width, game.height);
+        
+        game.ctx.font = '48px Arial';
+        game.ctx.fillStyle = '#00ffff';
+        game.ctx.textAlign = 'center';
+        game.ctx.textBaseline = 'middle';
+        game.ctx.fillText('游戏暂停', game.width / 2, game.height / 2);
+        
+        // 暂停背景音乐
+        game.bgMusic.pause();
+    } else {
+        // 恢复背景音乐
+        game.bgMusic.play().catch(e => console.log('音频播放失败:', e));
+    }
+}
+
+// 设置难度函数
+function setDifficulty(difficulty) {
+    window.gameInstance.setDifficulty(difficulty);
+}
+
 // 启动游戏
 window.addEventListener('load', () => {
-    new Game();
+    window.gameInstance = new Game(); // 将游戏实例存储为全局变量
 });
