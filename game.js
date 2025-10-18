@@ -45,6 +45,9 @@ class Game {
         this.bgMusic = document.getElementById('bgMusic');
         this.bgMusic.volume = 0.3;
         
+        // 音效管理系统
+        this.soundManager = new SoundManager();
+        
         // 时间戳记录（用于deltaTime计算）
         this.lastTime = 0;
         this.deltaTime = 0;
@@ -371,59 +374,73 @@ class Game {
     }
     
     checkCollisions() {
-        // 子弹击中敌机
-        for (let i = this.bullets.length - 1; i >= 0; i--) {
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                if (this.bullets[i] && this.enemies[j] && 
-                    this.checkCollision(this.bullets[i], this.enemies[j])) {
-                    
-                    // 添加爆炸粒子效果
-                    for (let k = 0; k < 8; k++) {
-                            this.particles.push(new Particle(
-                                this.bullets[i].x,
-                                this.bullets[i].y,
-                                (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+         // 子弹击中敌机
+         for (let i = this.bullets.length - 1; i >= 0; i--) {
+             for (let j = this.enemies.length - 1; j >= 0; j--) {
+                 if (this.bullets[i] && this.enemies[j] && 
+                     this.checkCollision(this.bullets[i], this.enemies[j])) {
+                     
+                     // 播放敌机被击中音效
+                     this.soundManager.playEnemyHitSound(
+                         this.enemies[j].x + this.enemies[j].width / 2,
+                         this.enemies[j].y + this.enemies[j].height / 2,
+                         this.width
+                     );
+                     
+                     // 添加爆炸粒子效果
+                     for (let k = 0; k < 8; k++) {
+                             this.particles.push(new Particle(
+                                 this.bullets[i].x,
+                                 this.bullets[i].y,
                                  (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
-                                '#ff6600',
-                                30
-                            ));
-                        }
-                    
-                    this.bullets.splice(i, 1);
-                    this.enemies[j].takeDamage(1);
-                    if (this.enemies[j].health <= 0) {
-                        // Boss死亡额外奖励和血量上限增加
-                        const scoreBonus = this.enemies[j].isBoss ? 100 : 10;
-                        this.score += scoreBonus;
-                        
-                        // 击败Boss增加血量上限
-                        if (this.enemies[j].isBoss) {
-                            this.maxHealth += 5;
-                            this.health = Math.min(this.health + 5, this.maxHealth); // 同时回复5点血量
-                        }
-                        
-                        // Boss死亡爆炸效果
-                        for (let k = 0; k < 30; k++) {
-                            this.particles.push(new Particle(
-                                this.enemies[j].x + this.enemies[j].width / 2,
-                                this.enemies[j].y + this.enemies[j].height / 2,
-                                (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+                                  (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+                                 '#ff6600',
+                                 30
+                             ));
+                         }
+                     
+                     this.bullets.splice(i, 1);
+                     this.enemies[j].takeDamage(1);
+                     if (this.enemies[j].health <= 0) {
+                         // Boss死亡额外奖励和血量上限增加
+                         const scoreBonus = this.enemies[j].isBoss ? 100 : 10;
+                         this.score += scoreBonus;
+                         
+                         // 击败Boss增加血量上限
+                         if (this.enemies[j].isBoss) {
+                             this.maxHealth += 5;
+                             this.health = Math.min(this.health + 5, this.maxHealth); // 同时回复5点血量
+                         }
+                         
+                         // Boss死亡爆炸效果
+                         for (let k = 0; k < 30; k++) {
+                             this.particles.push(new Particle(
+                                 this.enemies[j].x + this.enemies[j].width / 2,
+                                 this.enemies[j].y + this.enemies[j].height / 2,
                                  (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
-                                '#ff0000',
-                                80
-                            ));
-                        }
-                        
-                        this.enemies.splice(j, 1);
-                    }
-                    break;
-                }
-            }
-        }
+                                  (Math.random() - 0.5) * 36, // 速度再提升1.5倍：从24变为36
+                                 '#ff0000',
+                                 80
+                             ));
+                         }
+                         
+                         this.enemies.splice(j, 1);
+                     }
+                     break;
+                 }
+             }
+         }
         
         // 敌机子弹击中玩家
         for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
             if (this.checkCollision(this.enemyBullets[i], this.player)) {
+                // 播放玩家被击中音效
+                this.soundManager.playPlayerHitSound(
+                    this.player.x + this.player.width / 2,
+                    this.player.y + this.player.height / 2,
+                    this.width
+                );
+                
                 this.enemyBullets.splice(i, 1);
                 this.health -= 15;
                 
@@ -446,6 +463,13 @@ class Game {
             
             // 敌机子弹击中第二个玩家
             if (this.twoPlayerMode && this.player2 && this.checkCollision(this.enemyBullets[i], this.player2)) {
+                // 播放玩家被击中音效
+                this.soundManager.playPlayerHitSound(
+                    this.player2.x + this.player2.width / 2,
+                    this.player2.y + this.player2.height / 2,
+                    this.width
+                );
+                
                 this.enemyBullets.splice(i, 1);
                 this.health -= 15;
                 
@@ -470,6 +494,13 @@ class Game {
         // 玩家碰撞敌机
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.checkCollision(this.player, this.enemies[i])) {
+                // 播放玩家被击中音效
+                this.soundManager.playPlayerHitSound(
+                    this.player.x + this.player.width / 2,
+                    this.player.y + this.player.height / 2,
+                    this.width
+                );
+                
                 this.enemies.splice(i, 1);
                 this.health -= 15;
                 
@@ -492,6 +523,13 @@ class Game {
             
             // 第二个玩家碰撞敌机
             if (this.twoPlayerMode && this.player2 && this.checkCollision(this.player2, this.enemies[i])) {
+                // 播放玩家被击中音效
+                this.soundManager.playPlayerHitSound(
+                    this.player2.x + this.player2.width / 2,
+                    this.player2.y + this.player2.height / 2,
+                    this.width
+                );
+                
                 this.enemies.splice(i, 1);
                 this.health -= 15;
                 
@@ -985,8 +1023,8 @@ class Enemy {
     constructor(x, y, targetPlayer = null) {
         this.x = x;
         this.y = y;
-        this.width = 40;
-        this.height = 40;
+        this.width = 50;  // 从60调整为50
+        this.height = 50; // 从60调整为50
         this.speed = 3; // 速度再提升1.5倍：从2变为3
         this.moveSpeed = 1.5; // 速度再提升1.5倍：从1变为1.5
         this.health = 5;  // 3 * 1.5 = 4.5，向上取整为5
@@ -999,12 +1037,14 @@ class Enemy {
         // 基于时间更新位置
         this.y += this.speed * deltaTime * 60;
         
-        // 如果有目标玩家，向其靠拢
+        // 如果有目标玩家，向其靠拢（敌机中心点对准玩家中心点）
         if (this.targetPlayer) {
             const targetX = this.targetPlayer.x + this.targetPlayer.width / 2;
-            if (this.x < targetX) {
+            const enemyCenterX = this.x + this.width / 2;
+            
+            if (enemyCenterX < targetX) {
                 this.x += this.moveSpeed * deltaTime * 60;
-            } else if (this.x > targetX) {
+            } else if (enemyCenterX > targetX) {
                 this.x -= this.moveSpeed * deltaTime * 60;
             }
         }
@@ -1015,33 +1055,33 @@ class Enemy {
     }
     
     render(ctx) {
-        // 绘制敌机主体
+        // 绘制敌机主体 (调整为50x50尺寸)
         ctx.fillStyle = '#ff0000';
-        ctx.fillRect(this.x + 15, this.y + 8, 10, 24);
+        ctx.fillRect(this.x + 18.75, this.y + 10, 12.5, 30);
         
-        // 绘制机翼
+        // 绘制机翼 (调整为50x50尺寸)
         ctx.fillStyle = '#cc0000';
-        ctx.fillRect(this.x, this.y + 15, 40, 8);
+        ctx.fillRect(this.x, this.y + 18.75, 50, 10);
         
-        // 绘制机头
+        // 绘制机头 (调整为50x50尺寸)
         ctx.fillStyle = '#ff0000';
         ctx.beginPath();
-        ctx.moveTo(this.x + 20, this.y + 32);
-        ctx.lineTo(this.x + 8, this.y + 8);
-        ctx.lineTo(this.x + 32, this.y + 8);
+        ctx.moveTo(this.x + 25, this.y + 40);
+        ctx.lineTo(this.x + 10, this.y + 10);
+        ctx.lineTo(this.x + 40, this.y + 10);
         ctx.closePath();
         ctx.fill();
         
-        // 绘制血量条
-        const barWidth = 30;
-        const barHeight = 4;
+        // 绘制血量条 (调整为50x50尺寸)
+        const barWidth = 37.5;
+        const barHeight = 5;
         const healthPercent = this.health / this.maxHealth;
         
         ctx.fillStyle = '#ff0000';
-        ctx.fillRect(this.x + 5, this.y - 8, barWidth, barHeight);
+        ctx.fillRect(this.x + 6.25, this.y - 10, barWidth, barHeight);
         
         ctx.fillStyle = '#00ff00';
-        ctx.fillRect(this.x + 5, this.y - 8, barWidth * healthPercent, barHeight);
+        ctx.fillRect(this.x + 6.25, this.y - 10, barWidth * healthPercent, barHeight);
     }
 }
 
@@ -1049,8 +1089,8 @@ class Enemy {
 class Boss extends Enemy {
     constructor(x, y, targetPlayer = null) {
         super(x, y, targetPlayer);
-        this.width = 80;
-        this.height = 60;
+        this.width = 100; // 从120调整为100
+        this.height = 75; // 从90调整为75
         this.health = 23;  // 15 * 1.5 = 22.5，向上取整为23
         this.maxHealth = 23;
         this.speed = 1.5; // 速度再提升1.5倍：从1变为1.5
@@ -1114,49 +1154,49 @@ class Boss extends Enemy {
     }
     
     render(ctx) {
-        // 绘制Boss主体
+        // 绘制Boss主体 (调整为100x75尺寸)
         ctx.fillStyle = '#990000';
-        ctx.fillRect(this.x + 20, this.y + 15, 40, 30);
+        ctx.fillRect(this.x + 25, this.y + 18.75, 50, 37.5);
         
-        // 绘制Boss机翼
+        // 绘制Boss机翼 (调整为100x75尺寸)
         ctx.fillStyle = '#660000';
-        ctx.fillRect(this.x, this.y + 25, 80, 15);
+        ctx.fillRect(this.x, this.y + 31.25, 100, 18.75);
         
-        // 绘制Boss机头
+        // 绘制Boss机头 (调整为100x75尺寸)
         ctx.fillStyle = '#cc0000';
         ctx.beginPath();
-        ctx.moveTo(this.x + 40, this.y + 45);
-        ctx.lineTo(this.x + 15, this.y + 15);
-        ctx.lineTo(this.x + 65, this.y + 15);
+        ctx.moveTo(this.x + 50, this.y + 56.25);
+        ctx.lineTo(this.x + 18.75, this.y + 18.75);
+        ctx.lineTo(this.x + 81.25, this.y + 18.75);
         ctx.closePath();
         ctx.fill();
         
-        // Boss装甲
+        // Boss装甲 (调整为100x75尺寸)
         ctx.fillStyle = '#444444';
-        ctx.fillRect(this.x + 10, this.y + 20, 60, 8);
-        ctx.fillRect(this.x + 10, this.y + 32, 60, 8);
+        ctx.fillRect(this.x + 12.5, this.y + 25, 75, 10);
+        ctx.fillRect(this.x + 12.5, this.y + 40, 75, 10);
         
-        // Boss引擎
+        // Boss引擎 (调整为100x75尺寸)
         ctx.fillStyle = '#ff6600';
-        ctx.fillRect(this.x + 5, this.y + 50, 8, 10);
-        ctx.fillRect(this.x + 67, this.y + 50, 8, 10);
+        ctx.fillRect(this.x + 6.25, this.y + 62.5, 10, 12.5);
+        ctx.fillRect(this.x + 83.75, this.y + 62.5, 10, 12.5);
         
-        // 绘制Boss血量条（更大）
-        const barWidth = 60;
-        const barHeight = 6;
+        // 绘制Boss血量条（调整为100x75尺寸）
+        const barWidth = 75;
+        const barHeight = 7.5;
         const healthPercent = this.health / this.maxHealth;
         
         ctx.fillStyle = '#330000';
-        ctx.fillRect(this.x + 10, this.y - 12, barWidth, barHeight);
+        ctx.fillRect(this.x + 12.5, this.y - 15, barWidth, barHeight);
         
         ctx.fillStyle = '#ff0000';
-        ctx.fillRect(this.x + 10, this.y - 12, barWidth * healthPercent, barHeight);
+        ctx.fillRect(this.x + 12.5, this.y - 15, barWidth * healthPercent, barHeight);
         
-        // Boss标识
+        // Boss标识 (调整为100x75尺寸)
         ctx.fillStyle = '#ffff00';
-        ctx.font = '12px Arial';
+        ctx.font = '15px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('BOSS', this.x + this.width / 2, this.y - 18);
+        ctx.fillText('BOSS', this.x + this.width / 2, this.y - 22.5);
     }
 }
 
@@ -1347,6 +1387,169 @@ function toggleTwoPlayerMode() {
 window.addEventListener('load', () => {
     window.gameInstance = new Game(); // 将游戏实例存储为全局变量
 });
+
+// 规则弹窗功能
+// 音效管理系统
+class SoundManager {
+    constructor() {
+        this.audioContext = null;
+        this.masterVolume = 0.3; // 主音量
+        this.soundEnabled = true;
+        
+        // 初始化音频上下文
+        this.initAudioContext();
+    }
+    
+    initAudioContext() {
+        try {
+            // 创建音频上下文
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // 创建主音量节点
+            this.masterGain = this.audioContext.createGain();
+            this.masterGain.gain.value = this.masterVolume;
+            this.masterGain.connect(this.audioContext.destination);
+        } catch (error) {
+            console.warn('音频上下文初始化失败:', error);
+            this.soundEnabled = false;
+        }
+    }
+    
+    // 播放击中音效
+    playHitSound(x = 0, y = 0, canvasWidth = 800) {
+        if (!this.soundEnabled || !this.audioContext) return;
+        
+        try {
+            // 确保音频上下文已启动
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+            
+            // 创建振荡器
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            const panNode = this.audioContext.createStereoPanner();
+            
+            // 设置音效参数
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(200, this.audioContext.currentTime + 0.1);
+            
+            // 设置音量包络
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.15);
+            
+            // 设置立体声定位（基于x坐标）
+            const pan = (x / canvasWidth) * 2 - 1; // 将x坐标转换为-1到1的范围
+            panNode.pan.value = Math.max(-1, Math.min(1, pan));
+            
+            // 连接音频节点
+            oscillator.connect(gainNode);
+            gainNode.connect(panNode);
+            panNode.connect(this.masterGain);
+            
+            // 播放音效
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.15);
+            
+        } catch (error) {
+            console.warn('播放击中音效失败:', error);
+        }
+    }
+    
+    // 播放敌机被击中音效
+    playEnemyHitSound(x = 0, y = 0, canvasWidth = 800) {
+        if (!this.soundEnabled || !this.audioContext) return;
+        
+        try {
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+            
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            const panNode = this.audioContext.createStereoPanner();
+            
+            // 敌机击中音效 - 更低沉的声音，音量适中
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.2);
+            
+            // 调整音量，避免突兀
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.40, this.audioContext.currentTime + 0.02); 
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.25);
+            
+            // 立体声定位 - 增强空间感
+            const pan = (x / canvasWidth) * 2 - 1;
+            panNode.pan.value = Math.max(-1, Math.min(1, pan * 0.8)); // 稍微减少极端定位
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(panNode);
+            panNode.connect(this.masterGain);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.25);
+            
+        } catch (error) {
+            console.warn('播放敌机击中音效失败:', error);
+        }
+    }
+    
+    // 播放玩家被击中音效
+    playPlayerHitSound(x = 0, y = 0, canvasWidth = 800) {
+        if (!this.soundEnabled || !this.audioContext) return;
+        
+        try {
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+            
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            const panNode = this.audioContext.createStereoPanner();
+            
+            // 玩家被击中音效 - 警告音，音量适中
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(300, this.audioContext.currentTime);
+            oscillator.frequency.linearRampToValueAtTime(150, this.audioContext.currentTime + 0.3);
+            
+            // 调整音量，避免过于刺耳
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.60, this.audioContext.currentTime + 0.05); 
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.35);
+            
+            // 立体声定位
+            const pan = (x / canvasWidth) * 2 - 1;
+            panNode.pan.value = Math.max(-1, Math.min(1, pan * 0.8));
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(panNode);
+            panNode.connect(this.masterGain);
+            
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + 0.35);
+            
+        } catch (error) {
+            console.warn('播放玩家击中音效失败:', error);
+        }
+    }
+    
+    // 设置主音量
+    setMasterVolume(volume) {
+        this.masterVolume = Math.max(0, Math.min(1, volume));
+        if (this.masterGain) {
+            this.masterGain.gain.value = this.masterVolume;
+        }
+    }
+    
+    // 启用/禁用音效
+    toggleSound() {
+        this.soundEnabled = !this.soundEnabled;
+        return this.soundEnabled;
+    }
+}
 
 // 规则弹窗功能
 function showRules() {
