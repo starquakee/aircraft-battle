@@ -19,6 +19,7 @@ class Game {
         this.weaponLevel = 1;
         this.gameStartTime = 0;
         this.gameTime = 0;
+        this.lastScoreSecond = 0; // 用于跟踪每秒自动得分
         
         // 游戏对象数组
         this.bullets = [];
@@ -142,6 +143,12 @@ class Game {
         // 更新游戏时间
         if (this.gameStartTime > 0) {
             this.gameTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
+            
+            // 每秒自动获得2分
+            if (this.gameTime > this.lastScoreSecond) {
+                this.score += 2;
+                this.lastScoreSecond = this.gameTime;
+            }
         }
         
         // 更新玩家
@@ -1396,6 +1403,11 @@ class SoundManager {
         this.masterVolume = 0.3; // 主音量
         this.soundEnabled = true;
         
+        // 音效播放时间戳记录，用于防止短时间内重复播放
+        this.enemyHitTimestamps = new Map();
+        this.playerHitTimestamps = new Map();
+        this.hitSoundCooldown = 50; // 冷却时间（毫秒）
+        
         // 初始化音频上下文
         this.initAudioContext();
     }
@@ -1463,6 +1475,20 @@ class SoundManager {
         if (!this.soundEnabled || !this.audioContext) return;
         
         try {
+            // 检查冷却时间，防止短时间内重复播放
+            const now = Date.now();
+            const positionKey = `${Math.floor(x / 10)}_${Math.floor(y / 10)}`; // 位置网格化，10像素为一个网格
+            
+            if (this.enemyHitTimestamps.has(positionKey)) {
+                const lastPlayTime = this.enemyHitTimestamps.get(positionKey);
+                if (now - lastPlayTime < this.hitSoundCooldown) {
+                    return; // 还在冷却时间内，不播放音效
+                }
+            }
+            
+            // 记录本次播放时间
+            this.enemyHitTimestamps.set(positionKey, now);
+            
             if (this.audioContext.state === 'suspended') {
                 this.audioContext.resume();
             }
@@ -1476,9 +1502,9 @@ class SoundManager {
             oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(100, this.audioContext.currentTime + 0.2);
             
-            // 调整音量，避免突兀
+            // 调整音量，最大音量为现在的两倍（0.80），但有冷却时间防止太吵
             gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.40, this.audioContext.currentTime + 0.02); 
+            gainNode.gain.linearRampToValueAtTime(0.80, this.audioContext.currentTime + 0.02); 
             gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.25);
             
             // 立体声定位 - 增强空间感
