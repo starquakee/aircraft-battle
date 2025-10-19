@@ -696,7 +696,6 @@ class Game {
     
     updateUI() {
         document.getElementById('score').textContent = this.score;
-        document.getElementById('weaponLevel').textContent = this.weaponLevel;
         
         // 更新游戏时长显示
         const minutes = Math.floor(this.gameTime / 60);
@@ -776,7 +775,7 @@ class Game {
         this.particles.forEach(particle => particle.render(this.ctx));
         
         // 绘制能量条
-        this.drawEnergyBar();
+        // this.drawEnergyBar(); // 已注释掉，不再显示能量条
         
         // 游戏结束界面
         if (!this.gameRunning && this.gameStarted) {
