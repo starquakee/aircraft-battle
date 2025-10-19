@@ -21,6 +21,7 @@ class Game {
         this.gameTime = 0;
         this.lastScoreSecond = 0; // 用于跟踪每秒自动得分
         this.scoreTimer = 0; // 用于跟踪每秒自动得分的计时器
+        this.pauseStartTime = 0; // 用于记录游戏暂停的时间点
         
         // 游戏对象数组
         this.bullets = [];
@@ -55,6 +56,15 @@ class Game {
         this.deltaTime = 0;
         this.targetFPS = 60; // 目标帧率
         
+        // 能量系统
+        this.energy = 0; // 当前能量值
+        this.maxEnergy = 100; // 最大能量值
+        this.energyChargeRate = 10; // 击中敌机时的充能量（已改为固定1点）
+        this.energyBurstActive = false; // 能量爆发是否激活
+        this.energyBurstTimer = 0; // 能量爆发计时器
+        this.energyBurstCooldown = 2000; // 能量爆发冷却时间（毫秒）
+        this.energyBurstCooldownTimer = 0; // 能量爆发冷却计时器
+        
         this.init();
     }
     
@@ -62,6 +72,12 @@ class Game {
         // 绑定键盘事件
         document.addEventListener('keydown', (e) => {
             this.keys[e.key.toLowerCase()] = true;
+            
+            // 空格键激活能量爆发
+            if (e.key === ' ' && this.gameStarted && this.gameRunning && !this.gamePaused) {
+                this.activateEnergyBurst();
+                e.preventDefault(); // 防止页面滚动
+            }
         });
         
         document.addEventListener('keyup', (e) => {
@@ -83,7 +99,6 @@ class Game {
         this.gameStarted = true;
         this.gameRunning = true;
         this.gamePaused = false; // 确保游戏开始时不是暂停状态
-        this.gameStartTime = Date.now();
 
         // 重置游戏状态
         this.score = 0;
@@ -95,6 +110,12 @@ class Game {
         this.health = 100;
         this.maxHealth = 100;
 
+        // 重置能量系统
+        this.energy = 0;
+        this.energyBurstActive = false;
+        this.energyBurstTimer = 0;
+        this.energyBurstCooldownTimer = 0;
+
         // 重置玩家武器等级
         this.player.weaponLevel = 1;
 
@@ -102,6 +123,9 @@ class Game {
         if (this.twoPlayerMode) {
             this.player2 = new Player(this.width / 2 + 30, this.height - 120, true);
         }
+
+        // 在所有状态重置后再设置游戏开始时间
+        this.gameStartTime = Date.now();
 
         this.bgMusic.play().catch(e => console.log('音频播放失败:', e));
     }
@@ -157,14 +181,25 @@ class Game {
             this.gameTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
         }
         
+        // 更新能量爆发状态（基于能量消耗）
+        if (this.energyBurstActive) {
+            // 每秒消耗25点能量
+            const energyConsumption = 25 * deltaTime;
+            this.energy = Math.max(0, this.energy - energyConsumption);
+            
+            // 能量耗尽时自动恢复普通状态
+            if (this.energy <= 0) {
+                this.energyBurstActive = false;
+                this.energyBurstTimer = 0;
+            }
+        }
+        
         // 每秒自动获得2分 - 使用计时器而不是绝对时间戳
         // 确保在游戏运行时始终更新计时器，不受gameTime更新的限制
         this.scoreTimer += deltaTime;
         if (this.scoreTimer >= 1) {
             this.score += 2;
             this.scoreTimer -= 1; // 减去1秒，保留余数
-            // 调试信息：确保计分正常工作
-            console.log(`自动计分: +2, 当前分数: ${this.score}, 计时器: ${this.scoreTimer.toFixed(2)}`);
         }
         
         // 更新玩家
@@ -174,7 +209,7 @@ class Game {
         player1Keys['s'] = this.keys['s'] || false;
         player1Keys['a'] = this.keys['a'] || false;
         player1Keys['d'] = this.keys['d'] || false;
-        this.player.update(player1Keys, this.width, this.height, deltaTime);
+        this.player.update(player1Keys, this.width, this.height, deltaTime, this.energyBurstActive);
         
         // 更新第二个玩家（如果存在）
         if (this.twoPlayerMode && this.player2) {
@@ -184,12 +219,18 @@ class Game {
             player2Keys['arrowdown'] = this.keys['arrowdown'] || false;
             player2Keys['arrowleft'] = this.keys['arrowleft'] || false;
             player2Keys['arrowright'] = this.keys['arrowright'] || false;
-            this.player2.update(player2Keys, this.width, this.height, deltaTime);
+            this.player2.update(player2Keys, this.width, this.height, deltaTime, this.energyBurstActive);
         }
         
         // 自动射击 - 根据武器等级调整射击频率
         this.shootTimer += deltaTime * 60;
-        const shootInterval = Math.max(3, Math.floor((25 - this.player.weaponLevel * 2) / 3)); // 射速提升3倍：间隔缩短为1/3
+        let shootInterval = Math.max(3, Math.floor((25 - this.player.weaponLevel * 2) / 3)); // 射速提升3倍：间隔缩短为1/3
+        
+        // 能量爆发时提升射击速度
+        if (this.energyBurstActive) {
+            shootInterval = Math.max(1, Math.floor(shootInterval / 1.5)); // 射击间隔缩短为原来的2/3（射速提升1.5倍）
+        }
+        
         if (this.shootTimer > shootInterval) {
             this.shoot();
             this.shootTimer = 0;
@@ -200,7 +241,10 @@ class Game {
             // 第二个玩家自动射击
             if (!this.player2.shootTimer) this.player2.shootTimer = 0;
             this.player2.shootTimer += deltaTime * 60;
-            if (this.player2.shootTimer > shootInterval) {
+            
+            let player2ShootInterval = shootInterval; // 使用相同的射击间隔
+            
+            if (this.player2.shootTimer > player2ShootInterval) {
                 const bullets = this.player2.shoot(this.player2.weaponLevel);
                 this.bullets.push(...bullets);
                 
@@ -238,8 +282,15 @@ class Game {
         });
         
         // 生成敌机
+        // 生成敌机 - 每10秒提升初始出现频率的10%，无时间上限
         this.enemySpawnTimer += deltaTime * 60;
-        if (this.enemySpawnTimer > 200) {
+        
+        // 计算动态出现间隔：基础间隔200，每10秒减少10%（即频率提升10%）
+        const baseInterval = 200;
+        const frequencyMultiplier = 1 + Math.floor(this.gameTime / 10) * 0.1; // 每10秒增加10%频率
+        const dynamicInterval = baseInterval / frequencyMultiplier;
+        
+        if (this.enemySpawnTimer > dynamicInterval) {
             this.spawnEnemy();
             this.enemySpawnTimer = 0;
         }
@@ -334,7 +385,7 @@ class Game {
             baseHealth = Math.floor(baseHealth * 1.5);
         }
         
-        // 计算敌机血量增长：每10秒增加初始血量的一半
+        // 计算敌机血量增长：每10秒增加初始血量的一半，无时间限制
         const timeBonus = Math.floor(this.gameTime / 10) * (baseHealth / 2);
         const enemyHealth = baseHealth + timeBonus;
         
@@ -424,6 +475,11 @@ class Game {
                      
                      this.bullets.splice(i, 1);
                      this.enemies[j].takeDamage(1);
+                     
+                     // 击中敌机时增加能量：常规状态0.5点，无双状态0.1点
+                     const energyGain = this.energyBurstActive ? 0.1 : 0.5;
+                     this.energy = Math.min(this.energy + energyGain, this.maxEnergy);
+                     
                      if (this.enemies[j].health <= 0) {
                          // Boss死亡额外奖励和血量上限增加
                          const scoreBonus = this.enemies[j].isBoss ? 100 : 10;
@@ -677,11 +733,40 @@ class Game {
         }
         
         // 绘制游戏对象
-        this.player.render(this.ctx);
+        this.player.render(this.ctx, this.energyBurstActive);
         
         // 渲染第二个玩家（如果存在）
         if (this.twoPlayerMode && this.player2) {
-            this.player2.render(this.ctx);
+            this.player2.render(this.ctx, this.energyBurstActive);
+        }
+        
+        // 能量爆发时添加特殊粒子效果
+        if (this.energyBurstActive) {
+            // 在玩家周围生成能量粒子
+            for (let i = 0; i < 5; i++) {
+                this.particles.push(new Particle(
+                    this.player.x + this.player.width / 2 + (Math.random() - 0.5) * 60,
+                    this.player.y + this.player.height / 2 + (Math.random() - 0.5) * 60,
+                    (Math.random() - 0.5) * 8,
+                    (Math.random() - 0.5) * 8,
+                    '#ffff00',
+                    30
+                ));
+            }
+            
+            // 为第二个玩家也添加粒子效果
+            if (this.twoPlayerMode && this.player2) {
+                for (let i = 0; i < 5; i++) {
+                    this.particles.push(new Particle(
+                        this.player2.x + this.player2.width / 2 + (Math.random() - 0.5) * 60,
+                        this.player2.y + this.player2.height / 2 + (Math.random() - 0.5) * 60,
+                        (Math.random() - 0.5) * 8,
+                        (Math.random() - 0.5) * 8,
+                        '#ff0000',
+                        30
+                    ));
+                }
+            }
         }
         
         this.bullets.forEach(bullet => bullet.render(this.ctx));
@@ -689,6 +774,9 @@ class Game {
         this.enemies.forEach(enemy => enemy.render(this.ctx));
         this.powerUps.forEach(powerUp => powerUp.render(this.ctx));
         this.particles.forEach(particle => particle.render(this.ctx));
+        
+        // 绘制能量条
+        this.drawEnergyBar();
         
         // 游戏结束界面
         if (!this.gameRunning && this.gameStarted) {
@@ -714,7 +802,90 @@ class Game {
             this.ctx.fillRect(x, y, 1, 1);
         }
     }
-}
+    
+    // 绘制能量条
+    drawEnergyBar() {
+        const barWidth = 200;
+        const barHeight = 20;
+        const barX = this.width - barWidth - 20;
+        const barY = 20;
+        
+        // 绘制能量条背景
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(barX - 2, barY - 2, barWidth + 4, barHeight + 4);
+        
+        // 绘制能量条边框
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(barX, barY, barWidth, barHeight);
+        
+        // 计算能量百分比
+        const energyPercent = this.energy / this.maxEnergy;
+        const fillWidth = barWidth * energyPercent;
+        
+        // 绘制能量条填充
+        if (this.energy >= this.maxEnergy) {
+            // 能量满时使用闪烁的金色效果
+            const time = Date.now() * 0.01;
+            const alpha = 0.8 + 0.2 * Math.sin(time);
+            this.ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+        } else {
+            // 根据能量百分比改变颜色：红色->黄色->绿色->青色
+            if (energyPercent < 0.25) {
+                this.ctx.fillStyle = '#ff0000'; // 红色
+            } else if (energyPercent < 0.5) {
+                this.ctx.fillStyle = '#ff8000'; // 橙色
+            } else if (energyPercent < 0.75) {
+                this.ctx.fillStyle = '#ffff00'; // 黄色
+            } else {
+                this.ctx.fillStyle = '#00ff00'; // 绿色
+            }
+        }
+        
+        this.ctx.fillRect(barX, barY, fillWidth, barHeight);
+        
+        // 绘制能量条文本
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '14px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`能量: ${Math.floor(this.energy)}/${this.maxEnergy}`, 
+                         barX + barWidth / 2, barY + barHeight + 18);
+        
+        // 如果能量爆发激活，显示剩余能量
+        if (this.energyBurstActive) {
+            this.ctx.fillStyle = '#ffff00';
+            this.ctx.font = '16px Arial';
+            this.ctx.fillText(`能量爆发: ${Math.ceil(this.energy)}点`, barX + barWidth / 2, barY - 10);
+        } else if (this.energy >= this.maxEnergy) {
+            // 能量满时显示提示
+            this.ctx.fillStyle = '#ffff00';
+            this.ctx.font = '16px Arial';
+            this.ctx.fillText('按空格键激活能量爆发!', barX + barWidth / 2, barY - 10);
+        }
+     }
+     
+     // 激活能量爆发
+     activateEnergyBurst() {
+         // 检查能量是否充满且当前未激活无双状态
+         if (this.energy >= this.maxEnergy && !this.energyBurstActive) {
+             this.energyBurstActive = true;
+             this.energyBurstTimer = 0;
+             // 不再立即清空能量，而是在update中逐渐消耗
+             
+             // 添加能量爆发特效
+             for (let i = 0; i < 20; i++) {
+                 this.particles.push(new Particle(
+                     this.player.x + this.player.width / 2,
+                     this.player.y + this.player.height / 2,
+                     (Math.random() - 0.5) * 10,
+                     (Math.random() - 0.5) * 10,
+                     '#ffff00',
+                     60
+                 ));
+             }
+         }
+     }
+ }
 
 // 粒子效果类
 class Particle {
@@ -754,9 +925,14 @@ class Player {
         this.weaponLevel = 1; // 独立的武器等级
     }
     
-    update(keys, canvasWidth, canvasHeight, deltaTime = 1/60) {
+    update(keys, canvasWidth, canvasHeight, deltaTime = 1/60, energyBurstActive = false) {
         // 基于时间的移动速度（像素/秒）
-        const moveSpeed = this.speed * deltaTime * 60; // 60fps为基准
+        let moveSpeed = this.speed * deltaTime * 60; // 60fps为基准
+        
+        // 能量爆发时提升移动速度
+        if (energyBurstActive) {
+            moveSpeed *= 1.5; // 移动速度提升1.5倍
+        }
         
         if (this.isPlayer2) {
             // 第二个玩家使用箭头键
@@ -850,7 +1026,15 @@ class Player {
         return bullets;
     }
     
-    render(ctx) {
+    render(ctx, energyBurstActive = false) {
+        // 能量爆发时的发光效果
+        if (energyBurstActive) {
+            ctx.save();
+            ctx.shadowColor = this.isPlayer2 ? '#ff0000' : '#00ff00';
+            ctx.shadowBlur = 20;
+            ctx.globalAlpha = 0.8 + Math.sin(Date.now() * 0.01) * 0.2; // 闪烁效果
+        }
+        
         // 根据是否为第二个玩家选择颜色
         const mainColor = this.isPlayer2 ? '#ff0000' : '#00ff00';
         const wingColor = this.isPlayer2 ? '#cc0000' : '#00cc00';
@@ -885,6 +1069,11 @@ class Player {
         ctx.beginPath();
         ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 35, 0, Math.PI * 2);
         ctx.stroke();
+        
+        // 恢复上下文状态（如果有能量爆发效果）
+        if (energyBurstActive) {
+            ctx.restore();
+        }
     }
 }
 
@@ -1167,8 +1356,8 @@ class Boss extends Enemy {
             const dx = targetX - centerX;
             const dy = playerY - centerY;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const vx = (dx / distance) * 3;
-            const vy = (dy / distance) * 3;
+            const vx = (dx / distance) * 3.6;
+            const vy = (dy / distance) * 3.6;
             
             bullets.push(new EnemyBullet(centerX + i * 15, centerY, vx, vy));
         }
@@ -1320,6 +1509,7 @@ function restartGame() {
     game.gameTime = 0;
     game.scoreTimer = 0;
     game.lastScoreSecond = 0;
+    game.pauseStartTime = 0; // 重置暂停开始时间
 
     // 重置所有计时器
     game.enemySpawnTimer = 0;
@@ -1327,6 +1517,12 @@ function restartGame() {
     game.shootTimer = 0;
     game.shootTimer2 = 0;
     game.bossSpawnTimer = 0;
+
+    // 重置能量系统
+    game.energy = 0;
+    game.energyBurstActive = false;
+    game.energyBurstTimer = 0;
+    game.energyBurstCooldownTimer = 0;
 
     // 清空所有游戏对象数组
     game.bullets = [];
@@ -1341,11 +1537,15 @@ function restartGame() {
 
     // 清空键盘状态
     game.keys = {};
+    
+    // 重置时间相关变量，确保重新开始后立即正确计分
+    game.lastTime = 0;
+    game.deltaTime = 0;
 
     // 立即开始新游戏
     setTimeout(() => {
         game.startGame();
-    }, 100); // 短暂延迟确保状态完全重置
+    }, 10); // 短暂延迟确保状态完全重置
 }
 
 // 暂停/继续游戏函数
@@ -1359,6 +1559,9 @@ function togglePause() {
     
     // 如果游戏暂停，显示提示信息
     if (game.gamePaused) {
+        // 记录暂停时间点
+        game.pauseStartTime = Date.now();
+        
         // 在画布中央显示"游戏暂停"文本
         game.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         game.ctx.fillRect(0, 0, game.width, game.height);
@@ -1372,6 +1575,13 @@ function togglePause() {
         // 暂停背景音乐
         game.bgMusic.pause();
     } else {
+        // 恢复游戏时，调整gameStartTime以排除暂停期间的时间
+        if (game.pauseStartTime) {
+            const pauseDuration = Date.now() - game.pauseStartTime;
+            game.gameStartTime += pauseDuration;
+            game.pauseStartTime = 0;
+        }
+        
         // 恢复背景音乐
         game.bgMusic.play().catch(e => console.log('音频播放失败:', e));
     }

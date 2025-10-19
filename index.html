@@ -293,12 +293,13 @@
 </head>
 <body>
     <div class="game-container">
-        <canvas id="gameCanvas" width="1000" height="750"></canvas>
+        <canvas id="gameCanvas" width="1200" height="900"></canvas>
         <div class="game-info">
             <div>血量: <span id="health">100</span></div>
             <div>得分: <span id="score">0</span></div>
             <div>武器等级: <span id="weaponLevel">1</span></div>
             <div>游戏时长: <span id="gameTime">00:00</span></div>
+            <div>能量: <span id="energy">0</span>/100</div>
         </div>
         
         <!-- 按钮容器 - 游戏外部右方 -->
@@ -347,6 +348,7 @@
             <ul>
                 <li>WASD 键控制飞机移动</li>
                 <li>自动射击，无需按键</li>
+                <li><strong>空格键：能量满时激活无双状态</strong></li>
             </ul>
             
             <p><strong>双人模式：</strong></p>
@@ -354,9 +356,23 @@
                 <li>玩家1：WASD 键控制移动</li>
                 <li>玩家2：方向键（↑↓←→）控制移动</li>
                 <li>两个玩家都可以自动射击</li>
+                <li><strong>空格键：能量满时激活无双状态</strong></li>
             </ul>
             
-            <h3>⚡ 能量豆系统</h3>
+            <h3>⚡ 能量系统</h3>
+            <ul>
+                <li><strong>能量获取：</strong></li>
+                <li>常规状态：击中敌机获得0.5点能量</li>
+                <li>无双状态：击中敌机获得0.15点能量</li>
+                <li>最大能量：100点</li>
+                <li><strong>无双状态：</strong></li>
+                <li>激活条件：能量达到100点时按空格键</li>
+                <li>效果：射击速度和移动速度提升1.5倍</li>
+                <li>消耗：每秒消耗25点能量</li>
+                <li>结束：能量耗尽时自动结束</li>
+            </ul>
+            
+            <h3>🎁 能量豆系统</h3>
             <ul>
                 <li>绿色能量豆：提升武器等级</li>
                 <li>红色能量豆：恢复生命值</li>
@@ -371,6 +387,7 @@
                 <li>等级3：三发子弹</li>
                 <li>等级4：扇形散射子弹</li>
                 <li>等级5：强力激光束</li>
+                <li>等级6-10：更强大的武器系统</li>
             </ul>
             
             <h3>💥 战斗系统</h3>
@@ -379,8 +396,10 @@
                 <li><strong>每秒自动获得2分</strong></li>
                 <li>碰撞敌机扣除生命值（单人25点，双人15点）</li>
                 <li>敌机子弹击中扣除15点生命值</li>
-                <li><strong>击败BOSS会提升血量上限</strong></li>
-                <li><strong>敌机血量每10秒提升初始血量的一半</strong></li>
+                <li><strong>击败BOSS会提升血量上限并回复5血</strong></li>
+                <li><strong>敌机血量每10秒提升初始血量的50%，无时间限制</strong></li>
+                <li><strong>敌机出现频率每10秒提升10%，无时间限制</strong></li>
+                <li><strong>Boss子弹速度比普通敌机快20%</strong></li>
                 <li>生命值归零游戏结束</li>
             </ul>
             
