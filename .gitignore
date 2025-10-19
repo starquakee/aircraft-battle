@@ -1,0 +1,6 @@
+AircraftBattle.spec
+CLAUDE.md
+.vscode/settings.json
+__pycache__/start.cpython-38.pyc
+build/
+dist/AircraftBattle.exe

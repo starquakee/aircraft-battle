@@ -297,7 +297,7 @@ class Game {
         
         // 生成Boss
         this.bossSpawnTimer += deltaTime * 60;
-        if (this.bossSpawnTimer > 2400 && Math.random() < 0.3) { // 40秒后有30%概率生成Boss
+        if (this.bossSpawnTimer > 1600 && Math.random() < 0.3) { // 约26.7秒后有30%概率生成Boss（频率提升1.5倍）
             this.spawnBoss();
             this.bossSpawnTimer = 0;
         }
