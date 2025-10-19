@@ -20,6 +20,7 @@ class Game {
         this.gameStartTime = 0;
         this.gameTime = 0;
         this.lastScoreSecond = 0; // 用于跟踪每秒自动得分
+        this.scoreTimer = 0; // 用于跟踪每秒自动得分的计时器
         
         // 游戏对象数组
         this.bullets = [];
@@ -83,16 +84,25 @@ class Game {
         this.gameRunning = true;
         this.gamePaused = false; // 确保游戏开始时不是暂停状态
         this.gameStartTime = Date.now();
-        
+
+        // 重置游戏状态
+        this.score = 0;
+        this.weaponLevel = 1;
+        this.scoreTimer = 0; // 重置计分计时器，确保立即开始计分
+        this.gameTime = 0;
+
         // 玩家血量固定为100，不受难度影响
         this.health = 100;
         this.maxHealth = 100;
-        
+
+        // 重置玩家武器等级
+        this.player.weaponLevel = 1;
+
         // 如果是双人模式，创建第二个玩家
         if (this.twoPlayerMode) {
             this.player2 = new Player(this.width / 2 + 30, this.height - 120, true);
         }
-        
+
         this.bgMusic.play().catch(e => console.log('音频播放失败:', e));
     }
     
@@ -125,14 +135,16 @@ class Game {
         // 计算时间差（秒）
         if (this.lastTime === 0) {
             this.lastTime = currentTime;
+            this.deltaTime = 1/60; // 设置默认的deltaTime，避免第一帧为0
+        } else {
+            this.deltaTime = (currentTime - this.lastTime) / 1000;
         }
-        this.deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
         // 限制最大deltaTime，防止卡顿导致的跳跃
         this.deltaTime = Math.min(this.deltaTime, 0.05); // 最大50ms
         
-        if (this.gameRunning && !this.gamePaused) {
+        if (this.gameStarted && this.gameRunning && !this.gamePaused) {
             this.update(this.deltaTime);
         }
         this.render();
@@ -143,12 +155,16 @@ class Game {
         // 更新游戏时间
         if (this.gameStartTime > 0) {
             this.gameTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
-            
-            // 每秒自动获得2分
-            if (this.gameTime > this.lastScoreSecond) {
-                this.score += 2;
-                this.lastScoreSecond = this.gameTime;
-            }
+        }
+        
+        // 每秒自动获得2分 - 使用计时器而不是绝对时间戳
+        // 确保在游戏运行时始终更新计时器，不受gameTime更新的限制
+        this.scoreTimer += deltaTime;
+        if (this.scoreTimer >= 1) {
+            this.score += 2;
+            this.scoreTimer -= 1; // 减去1秒，保留余数
+            // 调试信息：确保计分正常工作
+            console.log(`自动计分: +2, 当前分数: ${this.score}, 计时器: ${this.scoreTimer.toFixed(2)}`);
         }
         
         // 更新玩家
@@ -1283,70 +1299,53 @@ class PowerUp {
     }
 }
 
-// 重新开始游戏函数
+// 重新开始游戏函数 - 重置游戏状态而不刷新页面
 function restartGame() {
     const game = window.gameInstance;
-    if (game) {
-        // 停止背景音乐
-        game.bgMusic.pause();
-        game.bgMusic.currentTime = 0;
-        
-        // 保存当前难度和双人模式状态
-        const currentDifficulty = game.difficulty;
-        const currentTwoPlayerMode = game.twoPlayerMode;
-        
-        // 重置游戏状态
-        game.gameRunning = false;
-        game.gameStarted = false;
-        game.gamePaused = false;
-        game.score = 0;
-        game.health = 100;
-        game.maxHealth = 100;
-        game.weaponLevel = 1;
-        game.gameStartTime = 0;
-        game.gameTime = 0;
-        
-        // 清空所有游戏对象
-        game.bullets = [];
-        game.enemies = [];
-        game.powerUps = [];
-        game.enemyBullets = [];
-        game.particles = [];
-        
-        // 重置玩家位置
-        game.player.x = game.width / 2;
-        game.player.y = game.height - 120;
-        game.player.weaponLevel = 1; // 重置玩家武器等级
-        game.player2 = null;
-        
-        // 重置计时器
-        game.enemySpawnTimer = 0;
-        game.powerUpSpawnTimer = 0;
-        game.shootTimer = 0;
-        game.shootTimer2 = 0;
-        game.bossSpawnTimer = 0;
-        
-        // 重新应用保存的难度和双人模式
-        game.setDifficulty(currentDifficulty);
-        game.twoPlayerMode = currentTwoPlayerMode;
-        
-        // 如果双人模式开启，创建第二个玩家并设置武器等级
-        if (game.twoPlayerMode) {
-            game.player2 = new Player(game.width / 2 + 30, game.height - 120, true);
-            game.player2.weaponLevel = 1; // 重置第二个玩家武器等级
-        }
-        
-        // 更新UI状态
-        document.getElementById('difficultySelector').style.display = 'flex';
-        document.getElementById('pauseBtn').style.display = 'none';
-        
-        // 更新双人模式按钮状态
-        const twoPlayerBtn = document.querySelector('.two-player-toggle button');
-        if (twoPlayerBtn) {
-            twoPlayerBtn.textContent = game.twoPlayerMode ? '关闭双人' : '双人模式';
-            twoPlayerBtn.classList.toggle('active', game.twoPlayerMode);
-        }
-    }
+    if (!game) return;
+
+    // 停止背景音乐
+    game.bgMusic.pause();
+    game.bgMusic.currentTime = 0;
+
+    // 重置所有游戏状态
+    game.gameStarted = false;
+    game.gameRunning = false;
+    game.gamePaused = false;
+    game.score = 0;
+    game.health = 100;
+    game.maxHealth = 100;
+    game.weaponLevel = 1;
+    game.gameStartTime = 0;
+    game.gameTime = 0;
+    game.scoreTimer = 0;
+    game.lastScoreSecond = 0;
+
+    // 重置所有计时器
+    game.enemySpawnTimer = 0;
+    game.powerUpSpawnTimer = 0;
+    game.shootTimer = 0;
+    game.shootTimer2 = 0;
+    game.bossSpawnTimer = 0;
+
+    // 清空所有游戏对象数组
+    game.bullets = [];
+    game.enemies = [];
+    game.powerUps = [];
+    game.enemyBullets = [];
+    game.particles = [];
+
+    // 重置玩家
+    game.player = new Player(game.width / 2, game.height - 120);
+    game.player2 = null;
+
+    // 清空键盘状态
+    game.keys = {};
+
+    // 立即开始新游戏
+    setTimeout(() => {
+        game.startGame();
+    }, 100); // 短暂延迟确保状态完全重置
 }
 
 // 暂停/继续游戏函数
