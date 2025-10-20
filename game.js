@@ -775,7 +775,7 @@ class Game {
         this.particles.forEach(particle => particle.render(this.ctx));
         
         // 绘制能量条
-        // this.drawEnergyBar(); // 已注释掉，不再显示能量条
+        this.drawEnergyBar();
         
         // 游戏结束界面
         if (!this.gameRunning && this.gameStarted) {

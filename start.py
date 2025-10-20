@@ -42,6 +42,7 @@ def main():
     t.start()
 
     url = f"http://127.0.0.1:{port}/index.html"
+    print(url)
 
     # Give the server a moment to start, then open default browser
     for _ in range(10):
